@@ -42,62 +42,164 @@ class Item
 class ItemGroup
 {
     public:
-    std::list<Item *> itemGroupList;
+    std::list<Item *> itemList;
     public:
     void Add(Item * item, int maxWeight)
     {
-        for (std::list<Item *>::iterator it = itemGroupList.begin(); it != itemGroupList.end(); ++it) 
+        for (std::list<Item *>::iterator it = itemList.begin(); it != itemList.end(); ++it) 
         {
             if (item == (*it))
                 return;
         }
 
-        int totalPrice = TotalPrice();
-        if (totalPrice + item->price > maxWeight)
+        int totalWeight = TotalWeight();
+        if (totalWeight + item->weight > maxWeight)
             return;
 
-        itemGroupList.push_back(item);
+        itemList.push_back(item);
     }
 
     int TotalPrice()
     {
-        if (itemGroupList.empty())
+        if (itemList.empty())
             return 0;
 
         int totalPrice = 0;
-        for (std::list<Item *>::iterator it = itemGroupList.begin(); it != itemGroupList.end(); ++it) 
+        for (std::list<Item *>::iterator it = itemList.begin(); it != itemList.end(); ++it) 
         {
             totalPrice += (*it)->price;
         }
         return totalPrice;
     }
+
+    int TotalWeight()
+    {
+        if (itemList.empty())
+            return 0;
+
+        int totalWeight = 0;
+        for (std::list<Item *>::iterator it = itemList.begin(); it != itemList.end(); ++it) 
+        {
+            totalWeight += (*it)->weight;
+        }
+        return totalWeight;
+    }
+
+    bool IsSameGroup(ItemGroup * compareGroup)
+    {
+        if (itemList.size() != compareGroup->itemList.size())
+            return false;
+
+        int sameCount = 0;
+        for (std::list<Item *>::iterator it1 = itemList.begin(); it1 != itemList.end(); ++it1) 
+        {
+            for (std::list<Item *>::iterator it2 = compareGroup->itemList.begin(); it2 != compareGroup->itemList.end(); ++it2) 
+            {
+                if ((*it1)->weight == (*it2)->weight && (*it1)->price == (*it2)->price)
+                {
+                    sameCount++;
+                    break;
+                }
+            }
+        }
+
+        return sameCount == itemList.size() ? true : false;
+    }
 };
 
-void Combination(std::list<ItemGroup *> & itemGroupList, ItemGroup & itemGroup, std::list<Item *> & itemList, int maxWeight)
+class Combination
 {
-    for (std::list<Item *>::iterator it1 = itemList.begin(); it1 != itemList.end(); ++it1) 
+    private:
+    std::list<ItemGroup *> itemGroupList;
+    ItemGroup * currentItemGroup = 0;
+    ItemGroup * bestPriceGroup;
+
+    public:
+    void BeginCombination(std::list<Item *> & itemList, int maxWeight)
     {
-        itemGroup.Add((*it1), maxWeight);
-        std::list<Item *> remainiItemList;
-        for (std::list<Item *>::iterator it2 = itemList.begin(); it2 != itemList.end(); ++it2) 
+        for (std::list<Item *>::iterator it1 = itemList.begin(); it1 != itemList.end(); ++it1) 
         {
-            if ((*it1) == (*it2))
-                continue;
-            remainiItemList.push_back((*it2));
+            if (currentItemGroup == 0)
+                currentItemGroup = new ItemGroup();
+            currentItemGroup->Add((*it1), maxWeight);
+            std::list<Item *> remainiItemList;
+            for (std::list<Item *>::iterator it2 = itemList.begin(); it2 != itemList.end(); ++it2) 
+            {
+                if ((*it1) == (*it2))
+                    continue;
+                remainiItemList.push_back((*it2));
+            }
+            if (remainiItemList.empty())
+                return;
+
+            BeginCombination(remainiItemList, maxWeight);
+
+            AddGroup(currentItemGroup);
+            currentItemGroup = 0;
         }
-        if (remainiItemList.empty())
+    }
+
+    void AddGroup(ItemGroup * addItemGroup)
+    {
+        if (addItemGroup == 0)
             return;
 
-        Combination(itemGroupList, itemGroup, remainiItemList, maxWeight);
-        itemGroupList.push_back(&itemGroup);
+        for (std::list<ItemGroup *>::iterator it = itemGroupList.begin(); it != itemGroupList.end(); ++it) 
+        {
+            ItemGroup * temp = (*it);
+            if (temp == 0)
+                continue;
+
+            if (temp->IsSameGroup(addItemGroup))
+                return;
+        }
+
+        if (itemGroupList.empty())
+            bestPriceGroup = addItemGroup;
+        else
+        {
+            if (addItemGroup->TotalPrice() > bestPriceGroup->TotalPrice())
+                bestPriceGroup = addItemGroup;
+        }
+
+        itemGroupList.push_back(addItemGroup);
     }
-}
+
+    void DebugPrint()
+    {
+        int count = 0;
+        for (std::list<ItemGroup *>::iterator it1 = itemGroupList.begin(); it1 != itemGroupList.end(); ++it1) 
+        {
+            if ((*it1) == 0)
+                continue;
+            cout << count + 1 << "\n";
+            for (std::list<Item *>::iterator it2 = (*it1)->itemList.begin(); it2 != (*it1)->itemList.end(); ++it2) 
+            {
+                cout << (*it2)->weight << " " << (*it2)->price << "\n";
+            }
+            count++;
+        }
+    }
+
+    ItemGroup * BestPriceConbination()
+    {
+        if (bestPriceGroup != 0)
+        {
+            cout << "最佳組合\n";
+            for (std::list<Item *>::iterator it = bestPriceGroup->itemList.begin(); it != bestPriceGroup->itemList.end(); ++it) 
+            {
+                Item * tempItem = (*it);
+                cout << "重量 : " << tempItem->weight << "價值 : " << tempItem->price << "\n";
+            }
+        }    
+        return bestPriceGroup;
+    }
+};
 
 int main()
 {
     std::list<Item *> itemList;
-    std::list<ItemGroup *> itemGroupList;
-    ItemGroup itemGroup;
+    Combination combination;
     Backpack backpack;
     cout << "請輸入道具數量與最大承受重量\n";
     cin >> backpack.itemCount >> backpack.maxWeight;
@@ -111,31 +213,9 @@ int main()
         itemList.push_back(item);
     }
 
-    Combination(itemGroupList, itemGroup, itemList, backpack.maxWeight);
-
-    int count = 0;
-    for (std::list<ItemGroup *>::iterator it1 = itemGroupList.begin(); it1 != itemGroupList.end(); ++it1) 
-    {
-        cout << count + 1 << "\n";
-        for (std::list<Item *>::iterator it2 = (*it1)->itemGroupList.begin(); it2 != (*it1)->itemGroupList.end(); ++it2) 
-        {
-            cout << (*it2)->weight << " " << (*it2)->price << "\n";
-        }
-        count++;
-    }
-    /*for (std::list<Item *>::iterator it1 = itemList.begin(); it1 != itemList.end(); ++it1) 
-    {
-        ItemGroup * itemGroup = new ItemGroup();
-        itemGroup->Add((*it1), backpack.maxWeight);
-        for (std::list<Item *>::iterator it2 = itemList.begin(); it2 != itemList.end(); ++it2) 
-        {
-            if ((*it1) == (*it2))
-                continue;
-
-            itemGroup->Add((*it2), backpack.maxWeight); 
-        }
-        itemGroupList.push_back(itemGroup);
-    }*/
+    combination.BeginCombination(itemList, backpack.maxWeight);
+    combination.DebugPrint();
+    combination.BestPriceConbination();
 
     return 0;
 }
